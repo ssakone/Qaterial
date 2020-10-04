@@ -15,6 +15,8 @@
 #include <QApplication>
 #include <QQmlApplicationEngine>
 #include <QtQml>
+#include <SyntaxHighlighter.h>
+#include <TextCharFormat.h>
 
 // ──── DECLARATION ────
 
@@ -72,6 +74,8 @@ int main(int argc, char* argv[])
     QQmlApplicationEngine engine;
 
     // ──── REGISTER APPLICATION ────
+    qmlRegisterType< SyntaxHighlighter >("StephenQuan", 1, 0, "SyntaxHighlighter" );
+    qmlRegisterType< TextCharFormat >("StephenQuan", 1, 0, "TextCharFormat" );
 
     QGuiApplication::setOrganizationName("Qaterial");
     QGuiApplication::setApplicationName("Qaterial Hot Reload");

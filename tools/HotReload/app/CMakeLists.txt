@@ -2,13 +2,24 @@ set(QATERIAL_HOTRELOAD QaterialHotReload)
 message(STATUS "Add Tool: ${QATERIAL_HOTRELOAD}")
 
 include(cmake/FetchSortFilterProxyModel.cmake)
-
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
 qtquick_compiler_add_resources(QATERIAL_HOTRELOAD_APP_QML_RES qml/QaterialHotReloadApp.qrc)
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/qml/QaterialHotReloadApp.qrc
   ${CMAKE_CURRENT_BINARY_DIR}/QaterialHotReloadApp.qrc.junk)
+include_directories(include)
+SET(SOURCE
+    src/TextCharFormat.cpp
+    src/SyntaxHighlighter.cpp
+)
+SET(HEADERS
+    include/TextCharFormat.h
+    include/SyntaxHighlighter.h
+)
 
-add_executable(${QATERIAL_HOTRELOAD} src/Main.cpp ${QATERIAL_HOTRELOAD_APP_QML_RES})
+add_executable(${QATERIAL_HOTRELOAD} src/Main.cpp ${SOURCE} ${HEADERS}  ${QATERIAL_HOTRELOAD_APP_QML_RES})
 target_link_libraries(${QATERIAL_HOTRELOAD} PRIVATE QaterialHotReloadLib SortFilterProxyModel)
 set_target_properties(${QATERIAL_HOTRELOAD} PROPERTIES
   FOLDER "${QATERIAL_FOLDER_PREFIX}/HotReload")

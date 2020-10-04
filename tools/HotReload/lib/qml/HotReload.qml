@@ -9,7 +9,7 @@ import QtQuick.Controls 2.14
 import Qt.labs.settings 1.1 as QLab
 
 import Qaterial 1.0 as Qaterial
-
+import StephenQuan 1.0
 Qaterial.Page
 {
   id: root
@@ -20,6 +20,7 @@ Qaterial.Page
   property string currentFileName: currentFilePath.substring(currentFilePath.lastIndexOf('/')+1)
 
   property bool showFolderExplorer: true
+  property bool showCodeEditor: true
 
   property var currentImportPath: []
 
@@ -32,10 +33,37 @@ Qaterial.Page
   implicitWidth: 1280
   implicitHeight: 600
 
+  function getCode(source){
+    textFile.open(source, Qaterial.TextFile.Read)
+    var data = textFile.readAll()
+    root.currentFileUrl = source
+    textEdit.text = data
+  }
+  function saveCurrent(){
+    textFile.close()
+    textFile2.open(root.currentFileUrl, Qaterial.TextFile.Write)
+    textFile2.write(textEdit.text)
+    textFile2.close()
+    if(window.title.indexOf("*")!==-1){
+      window.title = window.title.slice(0, -1) 
+    }
+  }
   function loadFileInLoader(source)
   {
     Qaterial.DialogManager.close()
     loader.create(source)
+    getCode(source)
+
+  }
+  Qaterial.TextFile
+  {
+    id: textFile2
+    onErrorChanged: () => console.warn(`io error : ${error}`)
+  }
+  Qaterial.TextFile
+  {
+    id: textFile
+    onErrorChanged: () => console.warn(`io error : ${error}`)
   }
 
   function reload()
@@ -65,6 +93,7 @@ Qaterial.Page
     property alias currentImportPath: root.currentImportPath
 
     property alias showFolderExplorer: root.showFolderExplorer
+    property alias showCodeEditor: root.showCodeEditor
     property var folderSplitView
 
     property alias formatHorizontalAlignCenter: formatHorizontalAlignCenter.checked
@@ -88,6 +117,11 @@ Qaterial.Page
   {
     sequence: "Ctrl+O"
     onActivated: () => root.openFilePicker()
+  }
+  Shortcut
+  {
+    sequence: "Ctrl+S"
+    onActivated: () => root.saveCurrent()
   }
 
   function openFilePicker()
@@ -145,6 +179,26 @@ Qaterial.Page
         useSecondaryColor: true
 
         onClicked: () => root.openFolderPicker()
+      }
+      Qaterial.SquareButton {
+        ToolTip.visible: hovered || pressed
+        ToolTip.text: "Save File"
+        icon.source: Qaterial.Icons.contentSave
+        useSecondaryColor: true
+        onClicked: {
+          saveCurrent()
+        }
+      }
+       Qaterial.ToolSeparator {}
+      Qaterial.SquareButton {
+        ToolTip.visible: hovered || pressed
+        ToolTip.text: "Hide/Show Code Editor"
+        icon.source: Qaterial.Icons.codeBraces
+        useSecondaryColor: true
+        checked: root.showCodeEditor
+
+        onReleased: () => root.showCodeEditor = checked
+        
       }
 
       Qaterial.SquareButton
@@ -549,6 +603,7 @@ Qaterial.Page
       {
         id: loader
         width: parent.width
+        SplitView.minimumWidth: 300
         property var loadedObject: null
         property url createUrl
 
@@ -683,6 +738,180 @@ Qaterial.Page
           }
         }
       }
+      Rectangle
+      {
+        id: codeView
+        visible: root.showCodeEditor
+        color: Qaterial.Style.theme === Qaterial.Style.Theme.Dark ? "black" : "white"
+        z: 30
+
+        SplitView.preferredWidth: 100
+        //SplitView.minimumWidth: 0
+        Flickable {
+          id: flickable
+          visible: true
+          anchors.fill: parent
+          anchors.margins: 0
+          boundsBehavior: Flickable.StopAtBounds
+          contentWidth: frame.width
+          contentHeight: frame.height
+          clip: true
+
+
+          Frame {
+              id: frame
+
+              width: codeView.width<textEdit.implicitWidth? textEdit.implicitWidth+50 : textEdit.implicitWidth+20
+              contentWidth: columnLayout.width
+              contentHeight: columnLayout.height
+              clip: true
+              padding: 0
+              background: Rectangle {
+                  color: "black"
+              }
+
+              ColumnLayout {
+                  id: columnLayout
+
+                  width: frame.width
+
+                  TextEdit {
+                      id: textEdit
+                      property int currentLine: text.substring(0, cursorPosition).split(/\r\n|\r|\n/).length - 1
+                      onCurrentLineChanged: lineNumbers.currentIndex = currentLine
+                      Layout.fillWidth: true
+                      selectByMouse: true
+                      color: 'white'
+                      topPadding: 2
+                      font.pixelSize: 19
+                      font.family: 'Source Code Pro'
+                      tabStopDistance: 40
+                      leftPadding: 40
+                      selectedTextColor: Qt.lighter("teal")
+                      font.pointSize: 12
+                      onTextChanged: {
+                        if(window.title.indexOf("*")==-1) {
+                            window.title = window.title+"*"
+                          }
+                      }
+                  }
+              }
+              ListView {
+                  id: lineNumbers
+                  interactive: false
+                  property alias lineNumberFont: lineNumbers.textMetrics.font
+                  property color lineNumberBackground: "black"
+                  property color lineNumberColor: "white"
+                  property alias font: textEdit.font
+                  property alias text: textEdit.text
+                  property color textBackground: "white"
+                  property color textColor: "black"
+                  property TextMetrics textMetrics: TextMetrics { text: "999"; font: textEdit.font }
+                  model: textEdit.text.split(/\n/g)
+                  anchors.left: parent.left
+                  anchors.top: parent.top
+                  anchors.bottom: parent.bottom
+                  anchors.topMargin: 5
+                  width: textMetrics.boundingRect.width
+                  clip: true
+
+
+                  delegate: Rectangle {
+
+                      width: lineNumbers.width
+                      height: lineText.height
+                      color:  index==lineNumbers.currentIndex? "#424242" : lineNumbers.lineNumberBackground
+                      Text {
+                          id: lineNumber
+                          anchors.horizontalCenter: parent.horizontalCenter
+                          text: index + 1
+                          color: lineNumbers.lineNumberColor
+                          font: lineNumbers.textMetrics.font
+                      }
+
+                      Text {
+                          id: lineText
+                          width: flickable.width
+                          text: modelData
+                          font: textEdit.font
+                          visible: false
+                          wrapMode: Text.WordWrap
+                      }
+                  }
+                  Rectangle {
+                      width: 1
+                      height: parent.height
+                      color: "#212121"
+                      anchors.right: parent.right
+                  }
+
+                  onContentYChanged: {
+                      if (!moving) return
+                      flickable.contentY = contentY
+                  }
+              }
+          }
+      }
+
+      SyntaxHighlighter {
+          id: syntaxHighlighter
+          textDocument: textEdit.textDocument
+          onHighlightBlock: {
+              let rx = /\/\/.*|[A-Za-z.]+(\s*:)?|\d+(.\d*)?|'[^']*?'|"[^"]*?"/g
+              let m
+              while ( ( m = rx.exec(text) ) !== null ) {
+                  if (m[0].match(/^\/\/.*/)) {
+                      setFormat(m.index, m[0].length, commentFormat);
+                      continue;
+                  }
+                  if (m[0].match(/^[a-z][A-Za-z.]*\s*:/)) {
+                      setFormat(m.index, m[0].match(/^[a-z][A-Za-z.]*/)[0].length, propertyFormat);
+                      continue;
+                  }
+                  if (m[0].match(/^[a-z]/)) {
+                      let keywords = [ 'import', 'function', 'bool', 'var',
+                                      'int', 'string', 'let', 'const', 'property',
+                                      'if', 'continue', 'for', 'break', 'while',
+                          ]
+                      if (keywords.includes(m[0])) {
+                          setFormat(m.index, m[0].length, keywordFormat);
+                          continue;
+                      }
+                      continue;
+                  }
+                  if (m[0].match(/^[A-Z]/)) {
+                      setFormat(m.index, m[0].length, componentFormat);
+                      continue;
+                  }
+                  if (m[0].match(/^\d/)) {
+                      setFormat(m.index, m[0].length, numberFormat);
+                      continue;
+                  }
+                  if (m[0].match(/"(.*?)"/)) {
+                      setFormat(m.index, m[0].length, quotFormat);
+                      continue;
+                  }
+                  if (m[0].match(/^'/)) {
+                      setFormat(m.index, m[0].length, stringFormat);
+                      continue;
+                  }
+                  if (m[0].match(/^"/)) {
+                      setFormat(m.index, m[0].length, stringFormat);
+                      continue;
+                  }
+              }
+          }
+      }
+
+      TextCharFormat { id: keywordFormat; foreground: Qaterial.Colors.yellowA400}
+      TextCharFormat { id: componentFormat; foreground: Qaterial.Colors.greenA400; font.pointSize: textEdit.font.pixelSize+2; }
+      TextCharFormat { id: numberFormat; foreground: Qaterial.Colors.gray100 }
+      TextCharFormat { id: propertyFormat; foreground: Qaterial.Colors.redA400}
+      TextCharFormat { id: stringFormat; foreground: Qaterial.Colors.gray100}
+      TextCharFormat { id: quotFormat; foreground: Qaterial.Colors.purpleA400; font.bold: true; font.pointSize: textEdit.font.pixelSize-2; }
+      TextCharFormat { id: commentFormat; foreground: Qaterial.Colors.cyanA400 }
+
+      }
     }
 
     StatusView
@@ -746,6 +975,7 @@ Qaterial.Page
     if(root.currentFileUrl)
     {
       loader.create(root.currentFileUrl)
+      getCode(root.currentFileUrl)
       Qaterial.HotReload.watchFile(root.currentFilePath)
     }
   }
