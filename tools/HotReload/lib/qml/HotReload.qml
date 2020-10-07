@@ -777,6 +777,8 @@ Qaterial.Page
 
                   TextEdit {
                       id: textEdit
+                      property bool completion: false
+                      property var completionModel: ["Qaterial","Qaterial.AppBarButton","Qaterial.FabButton","Qaterial.Button","Qaterial.RoundButton","Qaterial.Colors.red","Qaterial.Colors.red50","Qaterial.Colors.red100","Qaterial.Colors.red200","Qaterial.Colors.red300","Qaterial.Colors.red400","Qaterial.Colors.red500","Qaterial.Colors.red600","Qaterial.Colors.red700","Qaterial.Colors.red800","Qaterial.Colors.red900"]
                       property int currentLine: text.substring(0, cursorPosition).split(/\r\n|\r|\n/).length - 1
                       onCurrentLineChanged: lineNumbers.currentIndex = currentLine
                       Layout.fillWidth: true
@@ -794,6 +796,114 @@ Qaterial.Page
                             window.title = window.title+"*"
                           }
                       }
+                      Keys.onDownPressed: {
+                          if(textEdit.completion){view.incrementCurrentIndex()}
+                          else{
+                            event.accepted = true;
+                            var c = textEdit.positionAt(textEdit.cursorRectangle.x,textEdit.cursorRectangle.y+textEdit.font.pixelSize+10)
+                            textEdit.cursorPosition = c
+                          }
+                        }
+                      Keys.onUpPressed: {
+                          if(textEdit.completion){view.decrementCurrentIndex()}
+                         else{event.accepted = true;
+                            var  c = textEdit.positionAt(textEdit.cursorRectangle.x,textEdit.cursorRectangle.y-textEdit.font.pixelSize+10)
+                            textEdit.cursorPosition = c
+                         }
+                      }
+                      Keys.onReturnPressed: {
+                        if(textEdit.completion){
+                          var t = text.slice(0, textEdit.cursorPosition).replace(new RegExp('\n', 'g'),' ').replace(new RegExp('\t', 'g'),' ')
+                          var w = t.split(" ").pop(-1)
+                          var v = t.lastIndexOf(" ")
+                          console.log(v)
+                          textEdit.remove(v+1, v+w.length+1)
+                          textEdit.insert(v+1, view.currentItem.value)
+                          pop.close()
+                          textEdit.completion = false
+                        }else {
+                          textEdit.insert(textEdit.cursorPosition, "\n")
+                        }
+                      }
+                      Popup {
+                          id: pop
+                          transformOrigin: Item.Top
+                          y: textEdit.cursorRectangle.y+textEdit.font.pixelSize
+                          x: textEdit.cursorRectangle.x
+                          height: view.height
+                          width: 300
+                          padding: 0
+                       
+                          Connections {
+                              target: textEdit
+                              function onTextChanged(s){
+                                  if(1){
+                                      var text = textEdit.text
+                                      var tt = text.slice(0, textEdit.cursorPosition).replace(new RegExp('\n', 'g'),' ').replace(new RegExp('\r', 'g'),' ').replace(new RegExp('\t', 'g'),' ')
+                                      var v = tt.lastIndexOf(" ")
+                                      var w = tt.split(" ").pop(-1)
+                                      var t = textEdit.getText(v+1, v+w.length+1)
+                                      view.model.clear()
+                                      if(t!=="" && /[a-z]/.test(t)){
+                                          for(var i=0; i<textEdit.completionModel.length;i++){
+                                              var er = textEdit.completionModel[i]
+                                              if(er.toUpperCase().indexOf(t.toUpperCase())!==-1){
+                                                  view.model.append({name: er})
+                                              }
+                                          }
+                                          if(view.model.count!==0){
+                                              pop.open()
+                                              textEdit.completion= true
+                                          }else {
+                                            pop.close()
+                                            textEdit.completion= false
+                                           }
+                                      }else {
+                                        pop.close()
+                                        textEdit.completion= false
+                                      }
+                                    }
+                                }
+                          }
+                          ListView {
+                              property color hightColor: Qaterial.Colors.teal600
+                              id: view
+                              width: parent.width
+                              height: 200
+                              model: ListModel{}
+                              spacing: 1
+                              clip: true
+                           interactive: true
+                          keyNavigationEnabled: true
+                              delegate: Qaterial.Label {
+                                  property var value: name
+                                  padding: 10
+                                  width: view .width
+                                  text: name.replace("\n","").replace("\t","")
+                                  wrapMode: Label.Wrap
+                                  color: view.currentIndex===index? Qaterial.Colors.white : Qaterial.Colors.black
+                                  background: Rectangle {
+                                      color:  view.currentIndex===index? area.containsMouse? Qt.darker(view.hightColor ) : view.hightColor : area.containsMouse? Qaterial.Colors.gray200 : Qaterial.Colors.white
+                                  }
+                                  MouseArea {
+                                      id: area
+                                      hoverEnabled: true
+                                      anchors.fill: parent
+                                      cursorShape: "PointingHandCursor"
+                                      onClicked: {
+                                          var t = text.slice(0, textEdit.cursorPosition).replace("\n"," ")
+                                var w = t.split(" ").pop(-1)
+                                var v = t.lastIndexOf(" ")
+                                console.log(v)
+                                textEdit.remove(v+1, v+w.length+1)
+                                textEdit.insert(v+1, view.currentItem.value)
+                                pop.close()
+                                 textEdit.completion = false
+                                      }
+                                  }
+                              }
+                          }
+                      }
                   }
               }
               ListView {
@@ -807,7 +917,7 @@ Qaterial.Page
                   property color textBackground: "white"
                   property color textColor: "black"
                   property TextMetrics textMetrics: TextMetrics { text: "999"; font: textEdit.font }
-                  model: textEdit.text.split(/\n/g)
+                  model: textEdit.lineCount //textEdit.text.split(/\n/g)
                   anchors.left: parent.left
                   anchors.top: parent.top
                   anchors.bottom: parent.bottom
@@ -819,7 +929,7 @@ Qaterial.Page
                   delegate: Rectangle {
 
                       width: lineNumbers.width
-                      height: lineText.height
+                      height: lineText.implicitHeight+1
                       color:  index==lineNumbers.currentIndex? "#424242" : lineNumbers.lineNumberBackground
                       Text {
                           id: lineNumber
